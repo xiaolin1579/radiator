@@ -2048,12 +2048,14 @@ static void parse_arg(int key, char *arg)
 		p = strstr(arg, "://");
 		if(p)
 		{
-			if(strncasecmp(arg, "http://", 7) && strncasecmp(arg, "https://", 8) &&
-			   strncasecmp(arg, "stratum+tcp://", 14))
-			{
-				printf("URL error\n");
-				exit(EXIT_FAILURE);
-			}
+			if (strncasecmp(arg, "http://", 7) &&
+                    strncasecmp(arg, "https://", 8) &&
+                    strncasecmp(arg, "stratum+tcp://", 14) &&
+                    strncasecmp(arg, "stratum+tcps://", 15) &&
+                    strncasecmp(arg, "stratum+ssl://", 14)) {
+                    fprintf(stderr, "unknown protocol -- '%s'\n", arg);
+                    show_usage_and_exit(1);
+                }
 			free(rpc_url);
 			rpc_url = strdup(arg);
 			short_url = &rpc_url[(p - arg) + 3];
@@ -2530,6 +2532,7 @@ bool strictaliasingtest(short *h, long *k)
 int main(int argc, char *argv[])
 {
 	struct thr_info *thr;
+	long flags;
 	int i;
 	
 	// strdup on char* to allow a common free() if used
@@ -2696,11 +2699,18 @@ int main(int argc, char *argv[])
 		proper_exit(EXIT_FAILURE);
 	}
 
-	if(curl_global_init(CURL_GLOBAL_ALL))
-	{
-		applog(LOG_ERR, "CURL initialization failed");
-		return 1;
-	}
+    flags = CURL_GLOBAL_ALL;
+    
+    if (!opt_benchmark)
+      if (strncasecmp(rpc_url,"https:",6) &&
+          strncasecmp(rpc_url,"stratum+tcps://",15) &&
+          strncasecmp(rpc_url,"stratum+ssl://",14))
+          flags &= ~CURL_GLOBAL_SSL;
+
+    if (curl_global_init(flags)) {
+        applog(LOG_ERR, "CURL initialization failed");
+        return 1;
+    }
 
 	if(opt_background)
 	{
